@@ -94,7 +94,7 @@ st.caption(
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
         "🌱 Start small",
-        "⏳ Time machine",
+        "⏳ Fast forward",
         "👀 The cost of looking",
         "🌧️ Worst case",
         "🔭 What might happen next",
@@ -296,72 +296,124 @@ with tab1:
 # ---------------------------------------------------------------- tab 2
 
 with tab2:
-    st.subheader("Travel back and invest a lump sum")
+    st.subheader("Fast forward: your money, years from now")
     st.markdown(
-        "Pick any year of the modern market. See exactly what happened — "
-        "including every scary drop along the way. Notice how the ending "
-        "usually looks nothing like the scariest middle."
+        "No regret math here — no \u201cif only you'd started in 2000.\u201d This "
+        "tab points **forward**. Pick what you're thinking of investing and "
+        "how long you'd leave it alone. Your money then travels **every "
+        "road the modern market has actually taken** over a stretch that "
+        "long — all overlaid. Not a prediction: the full set of real "
+        "journeys, so you can see the shape of what you'd be signing up for."
     )
 
-    c1, c2, c3 = st.columns(3)
-    start_year = c1.selectbox(
-        "Starting year", list(range(FIRST, LAST - 4)), index=0
-    )
-    amount = c2.select_slider(
-        "Amount invested",
-        options=[500, 1000, 2500, 5000, 10000, 25000, 50000],
+    c1, c2 = st.columns(2)
+    amount = c1.select_slider(
+        "If you invested",
+        options=[100, 250, 500, 1000, 2500, 5000, 10000, 25000],
         value=1000,
         format_func=money,
     )
-    max_h = LAST - start_year + 1
-    horizon2 = c3.slider("Years held", 5, max_h, min(15, max_h))
+    fwd = c2.slider("…and left it alone for (years)", 5, 20, 10)
 
-    path = growth_path(start_year, horizon2, amount)
-    final = path["value"].iloc[-1]
-    n_years = len(path) - 1
-    cagr = (final / amount) ** (1 / n_years) - 1
-    down_years = int((df.set_index("Year").loc[path["year"][1:], "r"] < 0).sum())
+    starts = list(range(FIRST, LAST - fwd + 2))
+    paths = []
+    for s in starts:
+        vals = [float(amount)]
+        v = float(amount)
+        for y in range(s, s + fwd):
+            v *= 1.0 + RET[y]
+            vals.append(v)
+        paths.append(vals)
+    endings = np.array([p[-1] for p in paths])
+    worst_i = int(endings.argmin())
+    best_i = int(endings.argmax())
+    med_i = int(np.abs(endings - np.median(endings)).argmin())
+    p_pos = float(np.mean(endings >= amount))
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Became", money(final), f"{(final / amount - 1):+.0%}")
-    m2.metric("Avg growth per year", f"{cagr:.1%}")
-    m3.metric("Down years survived", f"{down_years} of {n_years}")
-    m4.metric("Ended below start?", "No" if final >= amount else "Yes")
-
-    fig = go.Figure()
-    fig.add_scatter(
-        x=path["year"],
-        y=path["value"],
-        mode="lines",
-        line=dict(color=BLUE, width=3),
-        fill="tozeroy",
-        fillcolor="rgba(107,143,179,0.12)",
-        hovertemplate=DOLLAR_HOVER,
+    m1.metric(
+        "Roughest road ever",
+        money(endings[worst_i]),
+        f"{endings[worst_i] / amount - 1:+.0%}",
     )
+    m2.metric(
+        "Typical road",
+        money(endings[med_i]),
+        f"{endings[med_i] / amount - 1:+.0%}",
+    )
+    m3.metric(
+        "Best road ever",
+        money(endings[best_i]),
+        f"{endings[best_i] / amount - 1:+.0%}",
+    )
+    m4.metric(
+        "Roads that ended ahead",
+        f"{p_pos:.0%}",
+        f"of {len(starts)} real {fwd}-year journeys",
+        delta_color="off",
+    )
+
+    xs = list(range(fwd + 1))
+    fig = go.Figure()
+    for i, vals in enumerate(paths):
+        if i in (worst_i, med_i, best_i):
+            continue
+        fig.add_scatter(
+            x=xs,
+            y=vals,
+            mode="lines",
+            line=dict(color="rgba(107,143,179,0.22)", width=1.5),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    for i, color, label in [
+        (worst_i, RED, "roughest"),
+        (med_i, GOLD, "typical"),
+        (best_i, GREEN, "best"),
+    ]:
+        fig.add_scatter(
+            x=xs,
+            y=paths[i],
+            mode="lines",
+            line=dict(color=color, width=3),
+            name=f"{label} ({starts[i]}-{starts[i] + fwd})",
+            hovertemplate="year %{x}: %{y:$,.0f}<extra>" + label + "</extra>",
+        )
     fig.add_hline(
         y=amount,
         line_dash="dot",
         line_color=GRAY,
-        annotation_text="what you started with",
-        annotation_position="top left",
+        annotation_text="what you'd start with",
+        annotation_position="bottom right",
     )
     calm_layout(
         fig,
         dollars=True,
-        title=f"{money(amount)} invested at the start of {start_year}",
-        xaxis_title="Year",
+        title=(
+            f"{money(amount)} riding every real {fwd}-year stretch of the "
+            f"modern market ({len(starts)} journeys)"
+        ),
+        xaxis_title="Years from now",
         yaxis_title="Value",
-        showlegend=False,
+        legend=dict(orientation="h", yanchor="top", y=-0.18, x=0),
     )
-    fig.update_xaxes(tickformat="d")
     st.plotly_chart(fig, width="stretch")
 
-    if down_years:
-        st.markdown(
-            f"Along the way you'd have sat through **{down_years} losing "
-            f"years** — and this is still where you ended up. Every one of "
-            f"those years felt like a reason to quit. None of them was."
-        )
+    st.markdown(
+        f"""
+Every line is real history wearing your numbers. The wobble in the middle
+of even the best roads is normal — **the shape of the ride is drops and
+recoveries, and the destination mostly depends on how long you stay on the
+road.** Nobody knows which line the future will resemble. But notice what
+patience does: hold for {fwd} years and {p_pos:.0%} of every such journey
+this market has produced ended above where it started. Try sliding the
+years up and watch the floor rise.
+"""
+    )
+    st.caption(
+        "History's roads, not a forecast — the future can be better or "
+        "worse than anything shown. Dividends reinvested."
+    )
 
 # ---------------------------------------------------------------- tab 3
 

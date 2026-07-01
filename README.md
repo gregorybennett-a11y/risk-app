@@ -13,8 +13,9 @@ winning move.
 1. **🌱 Start small** — pick an amount and a rough rhythm (monthly,
    quarterly, whenever) and see the outcome of every possible starting
    year since 2000.
-2. **⏳ Time machine** — invest a lump sum in any year and watch what
-   actually happened.
+2. **⏳ Fast forward** — your amount rides every real 5-20 year stretch
+   of the modern market, overlaid, so you see the shape of the ride ahead
+   (history's roads, not a forecast).
 3. **👀 The cost of looking** — same investment, same decade: how much
    "losing" you experience depends only on how often you check.
 4. **🌧️ Worst case** — deliberately invest right before the dot-com bust,
